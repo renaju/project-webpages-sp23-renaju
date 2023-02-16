@@ -1,7 +1,315 @@
-<html>
-	<head>
-	</head>
-	<body>
-		Project 1 here
-	</body>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+</style>
+<title>CS 184 Rasterizer</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+</head>
+
+
+<body>
+
+<h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2023</h1>
+<h1 align="middle">Project 1: Rasterizer</h1>
+<h2 align="middle">Rena Ju, Kevin Li, CS184-y</h2>
+
+<br><br>
+
+<div>
+
+<h2 align="middle">Overview</h2>
+<p>
+  In this project, we built a rasterizer that can render SVGs as PNGs. The final
+  product is capable of interpolating, transforming, and texturizing objects on
+  the screen.
+  What we thought was interesting about this project was how we built this 
+  rasterizer one part upon another and everything came nicely together in the end.
+  We started with a basic triangle rasterizer that can draw single-colored objects.
+  Then we built upon that, mostly reusing the same code, to create a rasterizer capable
+  of rendering intermediate colors. Then we implemented pixel sampling and level sampling
+  methods that, in combination, can yield rendered images of different quality.
+
+</p>
+
+<h2 align="middle">Section I: Rasterization</h2>
+
+<h3 align="middle">Part 1: Rasterizing single-color triangles</h3>
+<p>
+  In Part 1, we start with a simple rasterizer of single-colored triangles. We 
+  implemented this in the function RasterizerImp::rasterize_triangle. The function 
+  takes in three points that are the three vertices of the triangle. As mentioned 
+  in lecture, the order of traversal of the triangle vertices has a significant 
+  effect on the rendered result. If the order of traversal is counterclockwise, 
+  the normal lines would point out of the triangle and points that should be in the 
+  triangle would be counted out.
+  Thus, before any computation, we first checked the orientation of the three input 
+  points. If the cross product between two adjacent edges of the triangle 
+  is negative, that means the three input points are traversed in 
+  a counterclockwise order, and we swap two of the points.
+  Below is an example of a rendered image without this check.
+</p>
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/task1/no_clockwise_check/screenshot_2-11_22-20-35.png" align="middle" width="400px"/>
+        <figcaption align="middle">Test6 image without vertices orientation check.</figcaption>
+      </td>
+      <td>
+        <img src="images/task1/completed/screenshot_2-11_22-17-33.png" align="middle" width="400px"/>
+        <figcaption align="middle">Test6 image after complete implementation.</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+<p>
+  After ensuring the correct order of traversal of triangle vertices, we computed 
+  the lines necessary for the point-in-triangle test. 
+  From the vertices of the triangle, we also computed a bounding box for the triangle. 
+  We only iterate through points in this bounding box to check if they are in the 
+  triangle, so we ensure that our algorithm is no worse than checking each sample 
+  within the bounding box of the triangle. For each of these points, we assigned 
+  color in the sample buffer. In the final step of the rasterization pipeline, 
+  RasterizerImp::resolve_to_framebuffer converts the color value to integers 
+  and translate the internal buffer to the screen buffer.
+  
+</p>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <img src="images/task1/completed/screenshot_2-13_23-8-48.png" align="middle" width="400px"/>
+      <figcaption align="middle">Test4 image after complete implementation.</figcaption>
+    </tr>
+    <br>
+  </table>
+</div>
+
+
+<h3 align="middle">Part 2: Antialiasing triangles</h3>
+<p>
+  As we can see from the pixel inspector, the rendered images in Part 1 have a 
+  jaggies. We can use supersampling to solve this problem. Supersampling is useful 
+  because we can get "intermediate values" for colors on the edges of the triangles, 
+  and the rendered images would look smoother.
+  To implement supersampling, we modified the set_sample_rate, set_framebuffer_target, 
+  rasterize_triangle, and resolve_to_framebuffer functions. 
+  Instead of directly assigning color to each pixel, we need to sample multiple 
+  points for each pixel according to the sample rate and assign the average of 
+  the colors to the point. In order to do this, in set_sample_rate and set_framebuffer_target, 
+  we resized the sample buffer to be of the size width * height * sample_rate. 
+  Within the bounding box of the triangle 
+  in the sample buffer, implemented in Part 1, we iterate sample_rate times for each pixel. 
+  We assigned color for each of the sample_rate points. In resolve_to_framebuffer, 
+  the colors of each of these points are summed and divided by sample_rate, obtaining 
+  the average color for each pixel.
+  The rendered images with sampling rate 1, 4, and 16 are shown below. 
+  We can see in the pixel inspectors that the skinny triangle corner that had 
+  jaggies is smoother with increasing sampling rate.
+</p>
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/task1/completed/screenshot_2-13_23-8-48.png" align="middle" width="400px"/>
+        <figcaption align="middle">Test4 image with sample rate 1.</figcaption>
+      </td>
+      <td>
+        <img src="images/task2/screenshot_2-13_23-10-59.png" align="middle" width="400px"/>
+        <figcaption align="middle">Test4 image with sample rate 4.</figcaption>
+      </td>
+      <td>
+        <img src="images/task2/screenshot_2-13_23-11-4.png" align="middle" width="400px"/>
+        <figcaption align="middle">Test4 image with sample rate 16.</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+
+
+<h3 align="middle">Part 3: Transforms</h3>
+<p>
+  To implement 2D transforms, we needed 3x3 homoegenous coordinate matrices, and
+  the transformation matrices are implemented according to lecture. We show our
+  cubeman after drinking three iced coffees.
+
+</p>
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/task3/screenshot_2-14_13-17-59.png" align="middle" width="400px"/>
+        <figcaption align="middle">Cubeman wants to pee.</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<h2 align="middle">Section II: Sampling</h2>
+
+<h3 align="middle">Part 4: Barycentric coordinates</h3>
+<p>
+  In texture mapping, it is crucial to compute the color value of points within 
+  a rasterized triangle. Barycentric coordinates can be used to represent a point
+  within a triangle using distances between the point and the vertices of the triangle.
+  Barycentric coordinates are useful for interpolating 
+  color values of three vertices of a triangle so that we do not have to explicitly 
+  compute color values of each pixel within the triangle. 
+
+</p>
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/task4/screenshot_2-14_15-8-56.png" align="middle" width="400px"/>
+        <figcaption align="middle">A triangle of nice gradient colors.</figcaption>
+      </td>
+      
+      <td>
+        <img src="images/task4/screenshot_2-12_22-40-30.png" align="middle" width="400px"/>
+        <figcaption align="middle">Test7 image with sampling rate 1.</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<h3 align="middle">Part 5: "Pixel sampling" for texture mapping</h3>
+<p>
+  Having implemented conversion from Cartesian coordinates to Barycentric coordinates, 
+  we are ready to compute the actual values of the textures. To do this, we first need 
+  to implement pixel sampling, which will allow us to map textures to the triangles 
+  we are rasterizing. Pixel sampling is changing the basis of a sampled point from 
+  xy coordinates to uv coordinates and obtaining the corresponding texture value 
+  from the texture space (uv space).
+  This can be done in two different sampling methods: nearest sampling and bilinear 
+  sampling.
+  Nearest sampling is taking the color value of the nearest texel. We implemented
+  this by rounding the uv coordinate values and directly taking the color values
+  at the corresponding indices.
+  Bilinear sampling is interpolating the color values of the four closest texels.
+  We implemented this by performing lerps: two horizontal lerps across the two
+  texels above and the two texels below, then a final vertical lerp across the two
+  lerped values.
+  Between the two methods, nearest sampling is easier to implement, but biliear 
+  sampling usually outperforms nearest sampling because it uses information from
+  more neighboring texels and therefore better captures the surrounding scene.
+  Below is an example of where bilinear sampling clearly defeats nearest sampling.
+</p>
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/task5/screenshot_2-15_16-14-28.png" align="middle" width="400px"/>
+        <figcaption align="middle">Nearest sampling at 1 sample per pixel.</figcaption>
+      </td>
+      <td>
+        <img src="images/task5/screenshot_2-15_16-14-33.png" align="middle" width="400px"/>
+        <figcaption align="middle">Nearest sampling at 16 sample per pixel.</figcaption>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <img src="images/task5/screenshot_2-15_16-14-45.png" align="middle" width="400px"/>
+        <figcaption align="middle">Bilinear sampling at 1 sample per pixel.</figcaption>
+      </td>
+      <td>
+        <img src="images/task5/screenshot_2-15_16-14-50.png" align="middle" width="400px"/>
+        <figcaption align="middle">Bilinear sampling at 16 sample per pixel.</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+<p>
+  As we can see from the above example, large difference occurs where high precision
+  is needed, such as around edges or thin lines. In the example above,
+  the latitude and longitude lines appear dashed in nearest-sampled images because
+  nearest sampling algorithm only considers the nearest texel. Some pixels that
+  should appear white hence appear blue. In contrast, lines in bilinear-sampled images
+  appear much smoother. We also observed that texture sampling methods seem to have
+  a more significant effect on the final appearance of the images than supersampling rates.
+</p>
+
+<h3 align="middle">Part 6: "Level sampling" with mipmaps for texture mapping</h3>
+<p>
+  In texture mapping, it is essential to consider the distance of the object from
+  the viewpoint. Objects that are farther away appear smaller, thus more texels need
+  to be covered per pixel. Level sampling with mipmaps allows us to downsample
+  and upsample texture values according to the distances of objects from the viewpoint.
+  We use level sampling to determine the appropriate mipmap level to use for a
+  particular pixel. To obtain the appropriate mipmap level, we first compute the
+  barycentric coordinates of (x,y), (x+1,y), (x,y+1). Then we compute the difference
+  vectors and scale them up by width and height in the x- and y-direction,
+  respectively. We used the difference vectors to compute the appropriate level of
+  mipmap by this formula: L = max(sqrt(du/dx ^ 2 + dv/dx ^ 2), sqrt(du/dy ^ 2 + dv/dy ^ 2)),
+  which is essentially the max of vectors norms, where [du/dx, dv/dx] and [du/dy, dv/dy] 
+  are the difference vectors.
+  Finally, we need to use the appropriate level to determine the color of the pixel.
+  There are three different methods to achieve this: zero-level sampling, nearest-level 
+  sampling, and bilinear sampling. Zero-level sampling is directly sampling from the 
+  zero-th level. Nearest-level sampling is rounding the level to the nearest integer 
+  and sampling from that level. Bilinear sampling is a weighted sum of the adjacent
+  mipmap levels; we implemented this using a simple arithmetic mean.
+  
+  Zero-level sampling is the fastest, easiest to implementm, and without memory overhead.
+  However, it performs the worst in mapping texture for objects that are far away
+  from the viewpoint because more space on the texture map would need to be covered.
+
+  Nearest-level sampling is slower, and has memory overhead of 1/3 of the space required
+  for level 0. It has decent antialising power because it chooses the closest
+  appropriate level to the pixel.
+
+  Biliniear sampling, similarly, has a memory overhead of 1/3 of the level 0 space.
+  It is also the slowest among the three sampling methods because it requires computating
+  of linear interpolation among nearby mipmap levels. However, as a result, it has 
+  the highest antialising power because it combines information from neighboring 
+  levels to compute the most appropriate level for the pixel.
+
+  Below are four examples using different combinations of level sampling and pixel
+  sampling methods.
+</p>
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/task6/screenshot_2-15_16-28-12.png" align="middle" width="400px"/>
+        <figcaption align="middle">L_ZERO and P_NEAREST.</figcaption>
+      </td>
+      <td>
+        <img src="images/task6/screenshot_2-15_16-28-17.png" align="middle" width="400px"/>
+        <figcaption align="middle">L_ZERO and P_LINEAR.</figcaption>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <img src="images/task6/screenshot_2-15_16-28-8.png" align="middle" width="400px"/>
+        <figcaption align="middle">L_NEAREST and P_NEAREST.</figcaption>
+      </td>
+      <td>
+        <img src="images/task6/screenshot_2-15_16-28-21.png" align="middle" width="400px"/>
+        <figcaption align="middle">L_NEAREST and P_LINEAR.</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<h2 align="middle">Section III: Art Competition</h2>
+<p>If you are not participating in the optional art competition, don't worry about this section!</p>
+
+<h3 align="middle">Part 7: Draw something interesting!</h3>
+
+</body>
 </html>
